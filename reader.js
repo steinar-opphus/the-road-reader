@@ -20,6 +20,22 @@ const ReaderRules = {
     const chapter = data.chapters.find(c => c.rank === cutoff);
     return page.file + (chapter ? '?chapter='+encodeURIComponent(chapter.id) : '');
   },
+  gallery(data, cutoff) {
+    const pages = new Map(data.pages.map(p => [p.id,p]));
+    return (data.gallery || []).flatMap(image => {
+      const variant = image.variants.find(v => {
+        const page = pages.get(v.page);
+        return v.from <= cutoff && (!v.page || (page && page.from <= cutoff && this.name(page,cutoff)));
+      });
+      if (!variant) return [];
+      return [{id:image.id,file:image.file,asset:image.asset,from:variant.from,caption:variant.caption,
+        title:variant.page ? this.name(pages.get(variant.page),cutoff) : ''}];
+    });
+  },
+  nextImage(data, id, cutoff) {
+    const images = this.gallery(data,cutoff), index = images.findIndex(i => i.id === id);
+    return index < 0 ? null : images[index+1] || null;
+  },
   blocks(page, cutoff) { return page.blocks.filter(b => b.from <= cutoff); },
   images(page, cutoff) { return page.images.filter(i => i.from <= cutoff); },
   keyFacts(page, cutoff) { return (page.key_facts || []).filter(b => b.from <= cutoff && (!b.until || cutoff < b.until)); },
@@ -72,6 +88,8 @@ if (typeof document !== 'undefined') (() => {
   const data = window.READER_DATA;
   if (!data) return;
   const en = {
+    gallery:'Gallery',galleryIntro:'Illustrations available at your reading position.',emptyGallery:'No illustrations are available at this reading position.',
+    backGallery:'Back to gallery',nextImage:'Next image',hiddenImage:'This illustration is not available at your reading position.',
     nextPage:'Next in',
     personality:'Personality',history:'History at first meeting',keyInformation:'At a glance',firstAppearance:'First appearance',previousHistory:'Earlier books',reviewedBackground:'Reviewed spoiler-free background',
     companion:'Reader wiki',explore:'Explore',about:'About this edition',yourReading:'YOUR READING',setPlace:'Reading position',
@@ -93,6 +111,8 @@ if (typeof document !== 'undefined') (() => {
     introduction:'Introduction',noSummary:'This chapter summary is awaiting a source-verified revision.', enlargeImage:'View larger image', closeImage:'Close image'
   };
   const nb = {
+    gallery:'Galleri',galleryIntro:'Illustrasjoner tilgjengelige ved din leseposisjon.',emptyGallery:'Ingen illustrasjoner er tilgjengelige ved denne leseposisjonen.',
+    backGallery:'Tilbake til galleriet',nextImage:'Neste bilde',hiddenImage:'Denne illustrasjonen er ikke tilgjengelig ved din leseposisjon.',
     nextPage:'Neste i',
     personality:'Personlighet',history:'Historie ved første møte',keyInformation:'Nøkkelinformasjon',firstAppearance:'Første opptreden',previousHistory:'Tidligere bøker',reviewedBackground:'Spoilervurdert bakgrunn',
     enlargeImage:'Vis større bilde', closeImage:'Lukk bilde',
@@ -111,7 +131,7 @@ if (typeof document !== 'undefined') (() => {
     books:'Bøker',bookPage:'Boken',chapterSummaries:'Kapitteloppsummeringer',chapters:'Kapitler',readBook:'Utforsk boken',bookHint:'LES KAPITTEL FOR KAPITTEL',
     bookHelp:'Bare oppsummeringer frem til leseposisjonen vises nedenfor.',available:'kapitler i denne utgaven',introduction:'Introduksjon',noSummary:'Denne kapitteloppsummeringen venter på en kildeverifisert revisjon.'
   };
-  const nn = {...nb,personality:'Personlegdom',history:'Historie ved første møte',keyInformation:'Nøkkelinformasjon',firstAppearance:'Første framkomst',previousHistory:'Tidlegare bøker',reviewedBackground:'Spoilervurdert bakgrunn',enlargeImage:'Vis større bilete',closeImage:'Lukk bilete',setPlace:'Leseposisjon',controlHelp:'Utforsk berre det du allereie har lese.',savedLocally:'Valet vert lagra i denne nettlesaren.',
+  const nn = {...nb,galleryIntro:'Illustrasjonar tilgjengelege ved leseposisjonen din.',emptyGallery:'Ingen illustrasjonar er tilgjengelege ved denne leseposisjonen.',nextImage:'Neste bilete',hiddenImage:'Denne illustrasjonen er ikkje tilgjengeleg ved leseposisjonen din.',personality:'Personlegdom',history:'Historie ved første møte',keyInformation:'Nøkkelinformasjon',firstAppearance:'Første framkomst',previousHistory:'Tidlegare bøker',reviewedBackground:'Spoilervurdert bakgrunn',enlargeImage:'Vis større bilete',closeImage:'Lukk bilete',setPlace:'Leseposisjon',controlHelp:'Utforsk berre det du allereie har lese.',savedLocally:'Valet vert lagra i denne nettlesaren.',
     notStarted:'Ikkje byrja',reset:'Nullstill leseposisjonen',begin:'Byrj med kapittel 1',startTitle:'Historia di byrjar her.',startText:'Vel det siste kapittelet du har lese ferdig. Personar, stader og bilete vert viste etter kvart som du møter dei.',
     choose:'Vel kapittel for å byrje',protected:'Seinare innhald er skjult',later:'Seinare innhald er skjult. Endre leseposisjonen når du er klar.',
     appearance:'Utsjånad',source:'Kjeldetilvisingar',imageCaption:'Illustrasjonen er ikkje kanonisk og vert først vist etter den dokumenterte kapittelgrensa.',
@@ -384,10 +404,37 @@ if (typeof document !== 'undefined') (() => {
     }
     app.append(el('p',{class:'later-note'},t.later),el('a',{href:'index.html',class:'back-link'},'← '+t.back));
   }
+  function galleryPage(id) {
+    const images = ReaderRules.gallery(data,cutoff);
+    const galleryHref = ReaderRules.navigationHref(data,{file:'gallery.html'},cutoff);
+    document.title = `${t.gallery} · ${data.title}`;
+    if (id === 'gallery') {
+      app.append(el('header',{class:'article-heading'},el('h1',{},t.gallery),el('p',{},t.galleryIntro)));
+      if (!images.length) { app.append(el('p',{class:'empty-state'},t.emptyGallery)); return; }
+      app.append(el('div',{class:'gallery-grid'},images.map(image =>
+        el('a',{class:'gallery-card',href:ReaderRules.navigationHref(data,image,cutoff)},
+          el('figure',{},el('img',{src:image.asset,alt:image.caption,loading:'lazy',decoding:'async'}),
+            el('figcaption',{},el('strong',{},image.title || t.illustration),el('p',{},image.caption)))))));
+      return;
+    }
+    const image = images.find(i => i.id === id);
+    app.append(el('a',{href:galleryHref,class:'back-link'},'← '+t.backGallery));
+    if (!image) { app.append(el('section',{class:'empty-state'},el('h1',{},t.hiddenImage))); return; }
+    document.title = `${image.title || t.illustration} · ${t.gallery} · ${data.title}`;
+    app.append(el('header',{class:'article-heading'},el('h1',{},image.title || t.illustration)));
+    const next = ReaderRules.nextImage(data,id,cutoff);
+    if (next) app.append(el('nav',{class:'article-next','aria-label':t.nextImage},
+      el('a',{href:ReaderRules.navigationHref(data,next,cutoff),rel:'next'},`${t.nextImage}: ${next.title || t.illustration} →`)));
+    app.append(el('figure',{class:'gallery-full'},el('img',{src:image.asset,alt:image.caption,decoding:'async'}),
+      el('figcaption',{},el('span',{class:'badge'},t.noncanonical),el('p',{},image.caption),el('p',{class:'tiny'},chapterLabel(image.from)))));
+  }
   function render() {
     // Replace, rather than merely hide, stale content when the reader moves backwards.
     closeImageViewer(); app.replaceChildren(); controls(); const pages = ReaderRules.pages(data,cutoff); nav(pages);
-    if (document.body.dataset.page === 'index') landing(pages); else article(lookup.get(document.body.dataset.page));
+    document.querySelectorAll('[data-gallery-link]').forEach(link => { link.href = ReaderRules.navigationHref(data,{file:'gallery.html'},cutoff); });
+    const pageId = document.body.dataset.page;
+    if (pageId === 'gallery' || pageId.startsWith('image-')) galleryPage(pageId);
+    else if (pageId === 'index') landing(pages); else article(lookup.get(pageId));
   }
   window.addEventListener('storage',event => { if (event.key === data.storageKey) { cutoff = ReaderRules.cutoff(data,event.newValue); render(); } });
   render();
