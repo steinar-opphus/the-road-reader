@@ -234,3 +234,7 @@ body:has(.image-viewer[open]) { overflow: hidden; }
   .directory-list { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+.article-next { margin: 0 0 24px; }
+.article-next a { display: inline-block; max-width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid currentColor; border-radius: 4px; overflow-wrap: anywhere; }
+.article-next a:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }

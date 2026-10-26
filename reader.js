@@ -6,6 +6,20 @@ const ReaderRules = {
   },
   name(page, cutoff) { return page.names.filter(n => n.from <= cutoff).at(-1)?.text || ''; },
   pages(data, cutoff) { return data.pages.filter(p => p.from <= cutoff && this.name(p, cutoff)); },
+  categoryPages(data, category, cutoff) {
+    const pages = this.pages(data,cutoff).filter(p => p.category === category);
+    // Book cards use reading order; all other directories sort the currently known names.
+    return category === 'books' ? pages : pages.sort((a,b) => this.name(a,cutoff).localeCompare(this.name(b,cutoff),data.language));
+  },
+  nextPage(data, page, cutoff) {
+    const pages = this.categoryPages(data,page.category,cutoff);
+    const index = pages.findIndex(p => p.id === page.id);
+    return index < 0 ? null : pages[index+1] || null;
+  },
+  navigationHref(data, page, cutoff) {
+    const chapter = data.chapters.find(c => c.rank === cutoff);
+    return page.file + (chapter ? '?chapter='+encodeURIComponent(chapter.id) : '');
+  },
   blocks(page, cutoff) { return page.blocks.filter(b => b.from <= cutoff); },
   images(page, cutoff) { return page.images.filter(i => i.from <= cutoff); },
   keyFacts(page, cutoff) { return (page.key_facts || []).filter(b => b.from <= cutoff && (!b.until || cutoff < b.until)); },
@@ -58,6 +72,7 @@ if (typeof document !== 'undefined') (() => {
   const data = window.READER_DATA;
   if (!data) return;
   const en = {
+    nextPage:'Next in',
     personality:'Personality',history:'History at first meeting',keyInformation:'At a glance',firstAppearance:'First appearance',previousHistory:'Earlier books',reviewedBackground:'Reviewed spoiler-free background',
     companion:'Reader wiki',explore:'Explore',about:'About this edition',yourReading:'YOUR READING',setPlace:'Reading position',
     controlHelp:'Explore only what you have already read.',savedLocally:'Your choice stays in this browser.',browse:'BROWSE THE WIKI',quietPromise:'The next discovery can wait.',
@@ -78,6 +93,7 @@ if (typeof document !== 'undefined') (() => {
     introduction:'Introduction',noSummary:'This chapter summary is awaiting a source-verified revision.', enlargeImage:'View larger image', closeImage:'Close image'
   };
   const nb = {
+    nextPage:'Neste i',
     personality:'Personlighet',history:'Historie ved første møte',keyInformation:'Nøkkelinformasjon',firstAppearance:'Første opptreden',previousHistory:'Tidligere bøker',reviewedBackground:'Spoilervurdert bakgrunn',
     enlargeImage:'Vis større bilde', closeImage:'Lukk bilde',
     companion:'Leserwiki',explore:'Utforsk',about:'Om denne utgaven',yourReading:'DIN LESING',setPlace:'Leseposisjon',controlHelp:'Utforsk bare det du allerede har lest.',
@@ -107,6 +123,11 @@ if (typeof document !== 'undefined') (() => {
   const app = document.getElementById('app');
   let cutoff = 0, query = '', storageOK = true;
   try { cutoff = ReaderRules.cutoff(data, localStorage.getItem(data.storageKey)); } catch { storageOK = false; }
+  const linkedCutoff = ReaderRules.cutoff(data,new URLSearchParams(window.location.search).get('chapter'));
+  if (linkedCutoff) {
+    cutoff = linkedCutoff;
+    try { localStorage.setItem(data.storageKey,data.chapters.find(c => c.rank === cutoff).id); } catch { storageOK = false; }
+  }
   const lookup = new Map(data.pages.map(p => [p.id,p]));
   function el(tag, attrs = {}, ...children) {
     const node = document.createElement(tag);
@@ -124,6 +145,9 @@ if (typeof document !== 'undefined') (() => {
   }
   function save(rank) {
     cutoff = rank;
+    // Remove a stale incoming position when the reader explicitly changes it.
+    const url = new URL(window.location.href); url.searchParams.delete('chapter');
+    try { window.history.replaceState(null,'',url); } catch { /* file previews may disallow history updates */ }
     try { if (rank) localStorage.setItem(data.storageKey,data.chapters.find(c => c.rank === rank).id); else localStorage.removeItem(data.storageKey); }
     catch { storageOK = false; }
     render();
@@ -237,7 +261,7 @@ if (typeof document !== 'undefined') (() => {
         if (!filtered.length) results.append(el('p',{class:'tiny'},t.noMatches));
         for (const [key,label] of Object.entries(data.categories)) {
           if (key === 'books') continue;
-          const members = filtered.filter(p => p.category === key).sort((a,b) => name(a).localeCompare(name(b),data.language));
+          const members = ReaderRules.categoryPages(data,key,cutoff).filter(p => filtered.includes(p));
           if (!members.length) continue;
           const list = el('ul',{class:'directory-list'},members.map(p => el('li',{},el('a',{href:p.file,'data-page-id':p.id},name(p)))));
           const section = el('section',{id:key,class:'directory-group'});
@@ -263,6 +287,10 @@ if (typeof document !== 'undefined') (() => {
     const blocks = ReaderRules.blocks(page,cutoff), images = ReaderRules.images(page,cutoff);
     app.append(el('div',{class:'breadcrumbs'},el('a',{href:'index.html'},t.explore),' / ',data.categories[page.category]),
       el('header',{class:'article-heading'},el('span',{class:'eyebrow'},data.categories[page.category]),el('h1',{},name(page))));
+    const next = ReaderRules.nextPage(data,page,cutoff);
+    if (next) app.append(el('nav',{class:'article-next','aria-label':`${t.nextPage} ${data.categories[page.category]}`},
+      el('a',{href:ReaderRules.navigationHref(data,next,cutoff),rel:'next'},el('span',{class:'tiny'},`${t.nextPage} ${data.categories[page.category]}: `),
+        el('span',{},name(next)),el('span',{'aria-hidden':'true'},' →'))));
     if (page.type === 'book') { bookArticle(page); return; }
     const lead = images.find(i => i.role === 'primary' && !i.spoiler);
     const facts = ReaderRules.keyFacts(page,cutoff);
