@@ -1,5 +1,16 @@
 'use strict';
 const ReaderRules = {
+  bookId(chapter) { return chapter.book_id || chapter.id.split('-')[0]; },
+  books(data) {
+    return [...new Map(data.chapters.map(c => [this.bookId(c),{id:this.bookId(c),title:c.book}])).values()];
+  },
+  step(data, cutoff, direction) {
+    const positions = [0,...data.chapters.map(c => c.rank)];
+    const index = positions.indexOf(cutoff);
+    return index < 0 || ![-1,1].includes(direction) ? null : positions[index+direction] ?? null;
+  },
+  bookEnd(data, book) { return data.chapters.filter(c => this.bookId(c) === book).at(-1)?.rank ?? null; },
+  lastPosition(data) { return data.chapters.at(-1)?.rank ?? 0; },
   link(token, page, cutoff) {
     const label = token.label || (page && this.name(page, cutoff)) || '';
     return {label, href: page && page.from <= cutoff && this.name(page, cutoff) ? page.file : null};
@@ -88,6 +99,12 @@ if (typeof document !== 'undefined') (() => {
   const data = window.READER_DATA;
   if (!data) return;
   const en = {
+    previous:'Previous',next:'Next',readThrough:'Read through',beforeFirst:'before the first {unit}',changeStatus:'Change reading status',
+    finishBook:'Mark this book as read',finishAll:'Mark series read (all available content)',resetStart:'Reset to start',undoReset:'Undo reset',
+    availableOnly:'Only content currently included in this wiki can be shown.',
+    confirmBook:'Show all available information through {position}? Earlier books are included. Missing content is not added.',
+    confirmAll:'Show all available wiki content through {position}? This wiki may cover only part of the series.',
+    firstPosition:'At the start',lastPosition:'At the end of available content',
     gallery:'Gallery',galleryIntro:'Illustrations available at your reading position.',emptyGallery:'No illustrations are available at this reading position.',
     backGallery:'Back to gallery',nextImage:'Next image',hiddenImage:'This illustration is not available at your reading position.',
     nextPage:'Next in',
@@ -96,7 +113,7 @@ if (typeof document !== 'undefined') (() => {
     controlHelp:'Explore only what you have already read.',savedLocally:'Your choice stays in this browser.',browse:'BROWSE THE WIKI',quietPromise:'The next discovery can wait.',
     footer:'An unofficial reading companion. Illustrations are artistic interpretations.',book:'Book',chapter:'Chapter',notStarted:'Not started',reset:'Reset reading position',
     heroA:'Explore the wiki.',heroB:'At your chapter.',edition:'READER WIKI',choose:'Choose your chapter to begin',protected:'Later material is hidden',
-    begin:'Begin with chapter 1',startTitle:'Your story starts here.',startText:'Choose the last chapter you have finished. People, places and illustrations will appear as you encounter them.',
+    begin:'Begin reading',startTitle:'Your story starts here.',startText:'Choose the last chapter you have finished. People, places and illustrations will appear as you encounter them.',
     featured:'People to follow',featuredHint:'A FEW FAMILIAR FACES',read:'Read their story',firstMeeting:'First meeting',search:'Find a page',searchPlaceholder:'Search known names…',
     people:'More people',other:'Explore the world',noMatches:'No known pages match your search.',later:'Later material stays hidden. Change your reading position when you are ready.',
     aboutTitle:'About this reader',aboutText:'This edition draws on the source-backed Markdown wiki. It organises its knowledge into a quieter, illustrated reading experience. Character development remains folded away until you choose to open it.',
@@ -111,6 +128,12 @@ if (typeof document !== 'undefined') (() => {
     introduction:'Introduction',noSummary:'This chapter summary is awaiting a source-verified revision.', enlargeImage:'View larger image', closeImage:'Close image'
   };
   const nb = {
+    previous:'Forrige',next:'Neste',readThrough:'Lest til og med',beforeFirst:'før første {unit}',changeStatus:'Endre lesestatus',
+    finishBook:'Marker denne boken som lest',finishAll:'Marker serien som lest (alt tilgjengelig innhold)',resetStart:'Tilbakestill til start',undoReset:'Angre tilbakestilling',
+    availableOnly:'Bare innhold som finnes i denne wikien kan vises.',
+    confirmBook:'Vis all tilgjengelig informasjon til og med {position}? Tidligere bøker er inkludert. Manglende innhold legges ikke til.',
+    confirmAll:'Vis alt tilgjengelig wikiinnhold til og med {position}? Wikien kan dekke bare deler av serien.',
+    firstPosition:'Ved starten',lastPosition:'Ved slutten av tilgjengelig innhold',
     gallery:'Galleri',galleryIntro:'Illustrasjoner tilgjengelige ved din leseposisjon.',emptyGallery:'Ingen illustrasjoner er tilgjengelige ved denne leseposisjonen.',
     backGallery:'Tilbake til galleriet',nextImage:'Neste bilde',hiddenImage:'Denne illustrasjonen er ikke tilgjengelig ved din leseposisjon.',
     nextPage:'Neste i',
@@ -119,7 +142,7 @@ if (typeof document !== 'undefined') (() => {
     companion:'Leserwiki',explore:'Utforsk',about:'Om denne utgaven',yourReading:'DIN LESING',setPlace:'Leseposisjon',controlHelp:'Utforsk bare det du allerede har lest.',
     savedLocally:'Valget lagres i denne nettleseren.',browse:'UTFORSK WIKIEN',quietPromise:'Neste oppdagelse kan vente.',footer:'En uoffisiell lesefølgesvenn. Bildene er kunstneriske tolkninger.',
     book:'Bok',chapter:'Kapittel',notStarted:'Ikke startet',reset:'Nullstill leseposisjon',heroA:'Utforsk wikien.',heroB:'På ditt kapittel.',edition:'LESERWIKI',
-    choose:'Velg kapittel for å begynne',protected:'Senere innhold er skjult',begin:'Begynn med kapittel 1',startTitle:'Historien din begynner her.',
+    choose:'Velg kapittel for å begynne',protected:'Senere innhold er skjult',begin:'Begynn \u00e5 lese',startTitle:'Historien din begynner her.',
     startText:'Velg det siste kapittelet du har lest ferdig. Personer, steder og bilder vises etter hvert som du møter dem.',featured:'Personer å følge',featuredHint:'NOEN KJENTE ANSIKTER',
     read:'Les historien',firstMeeting:'Første møte',search:'Finn en side',searchPlaceholder:'Søk etter kjente navn…',people:'Flere personer',other:'Utforsk verden',noMatches:'Ingen kjente sider passer søket.',
     later:'Senere innhold er skjult. Endre leseposisjonen når du er klar.',aboutTitle:'Om leserwikien',
@@ -132,16 +155,21 @@ if (typeof document !== 'undefined') (() => {
     bookHelp:'Bare oppsummeringer frem til leseposisjonen vises nedenfor.',available:'kapitler i denne utgaven',introduction:'Introduksjon',noSummary:'Denne kapitteloppsummeringen venter på en kildeverifisert revisjon.'
   };
   const nn = {...nb,galleryIntro:'Illustrasjonar tilgjengelege ved leseposisjonen din.',emptyGallery:'Ingen illustrasjonar er tilgjengelege ved denne leseposisjonen.',nextImage:'Neste bilete',hiddenImage:'Denne illustrasjonen er ikkje tilgjengeleg ved leseposisjonen din.',personality:'Personlegdom',history:'Historie ved første møte',keyInformation:'Nøkkelinformasjon',firstAppearance:'Første framkomst',previousHistory:'Tidlegare bøker',reviewedBackground:'Spoilervurdert bakgrunn',enlargeImage:'Vis større bilete',closeImage:'Lukk bilete',setPlace:'Leseposisjon',controlHelp:'Utforsk berre det du allereie har lese.',savedLocally:'Valet vert lagra i denne nettlesaren.',
-    notStarted:'Ikkje byrja',reset:'Nullstill leseposisjonen',begin:'Byrj med kapittel 1',startTitle:'Historia di byrjar her.',startText:'Vel det siste kapittelet du har lese ferdig. Personar, stader og bilete vert viste etter kvart som du møter dei.',
+    notStarted:'Ikkje byrja',reset:'Nullstill leseposisjonen',begin:'Byrj \u00e5 lese',startTitle:'Historia di byrjar her.',startText:'Vel det siste kapittelet du har lese ferdig. Personar, stader og bilete vert viste etter kvart som du møter dei.',
     choose:'Vel kapittel for å byrje',protected:'Seinare innhald er skjult',later:'Seinare innhald er skjult. Endre leseposisjonen når du er klar.',
     appearance:'Utsjånad',source:'Kjeldetilvisingar',imageCaption:'Illustrasjonen er ikkje kanonisk og vert først vist etter den dokumenterte kapittelgrensa.',
     artNote:'Bileta er kunstnarlege tolkingar og gjev ikkje ytterlegare kjeldebelegg om bøkene.',footer:'Ein uoffisiell lesefølgjesvein. Bileta er kunstnarlege tolkingar.',
     bookPage:'Boka',readBook:'Utforsk boka',chapterSummaries:'Kapitteloppsummeringar',bookHelp:'Berre oppsummeringar fram til leseposisjonen vert viste nedanfor.',
     available:'kapittel i denne utgåva',introduction:'Innleiing',noSummary:'Denne kapitteloppsummeringa ventar på ein kjeldeverifisert revisjon.'};
   const t = {...en,...(data.language === 'nn' ? nn : data.language === 'nb' ? nb : {})};
+  if (data.language === 'nn') Object.assign(t, {
+    previous:'Førre',finishBook:'Marker denne boka som lesen',finishAll:'Marker serien som lesen (alt tilgjengeleg innhald)',
+    availableOnly:'Berre innhald som finst i denne wikien kan visast.',
+    confirmBook:'Vis all tilgjengeleg informasjon til og med {position}? Tidlegare bøker er inkluderte. Manglande innhald vert ikkje lagt til.',
+    confirmAll:'Vis alt tilgjengeleg wikiinnhald til og med {position}? Wikien kan dekkje berre delar av serien.',lastPosition:'Ved slutten av tilgjengeleg innhald'});
   document.querySelectorAll('[data-ui]').forEach(el => { el.textContent = t[el.dataset.ui] || el.textContent; });
   const app = document.getElementById('app');
-  let cutoff = 0, query = '', storageOK = true;
+  let cutoff = 0, query = '', storageOK = true, undoCutoff = null;
   try { cutoff = ReaderRules.cutoff(data, localStorage.getItem(data.storageKey)); } catch { storageOK = false; }
   const linkedCutoff = ReaderRules.cutoff(data,new URLSearchParams(window.location.search).get('chapter'));
   if (linkedCutoff) {
@@ -163,34 +191,72 @@ if (typeof document !== 'undefined') (() => {
     const c = data.chapters.find(c => c.rank === rank);
     return c ? `${c.book} · ${t.chapter.toLowerCase()} ${c.number}` : '';
   }
-  function save(rank) {
-    cutoff = rank;
-    // Remove a stale incoming position when the reader explicitly changes it.
+  function positionLabel(rank) {
+    const chapter = data.chapters.find(c => c.rank === rank);
+    if (!chapter) return `${t.notStarted} — ${t.beforeFirst.replace('{unit}',t.chapter.toLowerCase())}`;
+    return `${t.book} ${Number(ReaderRules.bookId(chapter).slice(1))} · ${chapterLabel(rank)}`;
+  }
+  function clearPositionLink() {
     const url = new URL(window.location.href); url.searchParams.delete('chapter');
     try { window.history.replaceState(null,'',url); } catch { /* file previews may disallow history updates */ }
+  }
+  function focusControl(id) {
+    const target = document.getElementById(id);
+    (target && !target.disabled ? target : document.getElementById('reading-position'))?.focus();
+  }
+  function save(rank, focusId = 'reading-position', undo = null) {
+    if (rank !== 0 && !data.chapters.some(c => c.rank === rank)) return;
+    cutoff = rank;
+    undoCutoff = undo;
+    // Remove a stale incoming position when the reader explicitly changes it.
+    clearPositionLink();
     try { if (rank) localStorage.setItem(data.storageKey,data.chapters.find(c => c.rank === rank).id); else localStorage.removeItem(data.storageKey); }
     catch { storageOK = false; }
     render();
+    focusControl(focusId);
   }
   function controls() {
     const holder = document.getElementById('controls');
     holder.hidden = false; holder.replaceChildren();
     const book = el('select',{id:'book-choice','aria-label':t.book});
-    const books = [...new Set(data.chapters.map(c => c.book))];
-    books.forEach(b => book.append(el('option',{value:b},b)));
-    book.value = data.chapters.find(c => c.rank === cutoff)?.book || books[0];
+    const books = ReaderRules.books(data);
+    books.forEach((b,index) => book.append(el('option',{value:b.id},`${t.book} ${index+1} · ${b.title}`)));
+    const current = data.chapters.find(c => c.rank === cutoff);
+    book.value = current ? ReaderRules.bookId(current) : books[0]?.id;
     const chapter = el('select',{id:'chapter-choice','aria-label':t.chapter});
     function fill() {
       chapter.replaceChildren(el('option',{value:0},t.notStarted));
-      data.chapters.filter(c => c.book === book.value).forEach(c => chapter.append(el('option',{value:c.rank},`${t.chapter} ${c.number}`)));
+      data.chapters.filter(c => ReaderRules.bookId(c) === book.value).forEach(c => chapter.append(el('option',{value:c.rank},c.display_name || `${t.chapter} ${c.number}`)));
       chapter.value = String(cutoff);
       if (!chapter.value) chapter.value = '0';
     }
     fill();
-    book.addEventListener('change',() => { fill(); chapter.focus(); });
-    chapter.addEventListener('change',() => save(Number(chapter.value)));
-    holder.append(el('div',{},el('label',{for:'book-choice'},t.book),book),el('div',{},el('label',{for:'chapter-choice'},t.chapter),chapter),
-      el('button',{class:'reset',type:'button',onclick:() => save(0)},t.reset));
+    function stepButton(direction, id, label) {
+      const target = ReaderRules.step(data,cutoff,direction);
+      const destination = data.chapters.find(c => c.rank === target);
+      const sameBook = current && destination && ReaderRules.bookId(current) === ReaderRules.bookId(destination);
+      const hint = target === null ? (direction < 0 ? t.firstPosition : t.lastPosition) :
+        sameBook ? (destination.display_name || `${t.chapter} ${destination.number}`) : positionLabel(target);
+      return el('button',{id,type:'button',disabled:target === null,onclick:() => save(target,id)},
+        el('span',{},`${label} ${t.chapter.toLowerCase()}`),el('small',{},hint));
+    }
+    function complete(rank, message) {
+      if (rank !== null && rank !== cutoff && window.confirm(message.replace('{position}',positionLabel(rank)))) save(rank,'reading-status-menu');
+    }
+    const finishBook = el('button',{id:'finish-book',type:'button',disabled:ReaderRules.bookEnd(data,book.value) === cutoff,
+      onclick:() => complete(ReaderRules.bookEnd(data,book.value),t.confirmBook)},t.finishBook);
+    book.addEventListener('change',() => { fill(); finishBook.disabled = ReaderRules.bookEnd(data,book.value) === cutoff; chapter.focus(); });
+    chapter.addEventListener('change',() => save(Number(chapter.value),'chapter-choice'));
+    const menu = el('details',{class:'reading-actions'},el('summary',{id:'reading-status-menu'},t.changeStatus),
+      el('p',{class:'tiny'},t.availableOnly),finishBook);
+    if (books.length > 1) menu.append(el('button',{id:'finish-series',type:'button',disabled:cutoff === ReaderRules.lastPosition(data),
+      onclick:() => complete(ReaderRules.lastPosition(data),t.confirmAll)},t.finishAll));
+    menu.append(el('button',{id:'reset-reading',type:'button',disabled:cutoff === 0,onclick:() => save(0,'undo-reading',cutoff)},
+      t.resetStart,el('small',{},positionLabel(0))));
+    holder.append(el('p',{id:'reading-position',class:'reading-position',role:'status',tabindex:'-1'},el('strong',{},t.readThrough+': '),positionLabel(cutoff)),
+      el('div',{class:'reading-steps'},stepButton(-1,'previous-chapter',t.previous),stepButton(1,'next-chapter',t.next)),
+      el('div',{class:'reading-selectors'},el('div',{},el('label',{for:'book-choice'},t.book),book),el('div',{},el('label',{for:'chapter-choice'},t.chapter),chapter)),menu);
+    if (undoCutoff !== null) holder.append(el('button',{id:'undo-reading',class:'reading-undo',type:'button',onclick:() => save(undoCutoff,'reading-status-menu')},t.undoReset));
     document.querySelector('.privacy-note').textContent = storageOK ? t.savedLocally : t.noStorage;
   }
   function tokens(block) {
@@ -264,7 +330,7 @@ if (typeof document !== 'undefined') (() => {
     document.title = `${data.title} · ${t.companion}`;
     app.append(el('section',{class:'hero'},el('span',{class:'eyebrow'},t.edition),el('h1',{},t.heroA,el('br'),el('em',{},t.heroB)),
       el('p',{class:'intro'},data.description),el('div',{class:'hero-bottom'},el('span',{class:'status-pill'},cutoff?chapterLabel(cutoff):t.choose),
-        cutoff ? el('span',{class:'tiny'},t.protected) : el('button',{class:'primary',type:'button',onclick:() => save(1)},t.begin))));
+        cutoff ? el('span',{class:'tiny'},t.protected) : el('button',{class:'primary',type:'button',onclick:() => save(ReaderRules.step(data,0,1))},t.begin))));
     if (!cutoff) app.append(el('section',{class:'empty-state'},el('h2',{},t.startTitle),el('p',{},t.startText)));
     const books = pages.filter(p => p.type === 'book');
     if (books.length) app.append(el('section',{id:'books'},el('div',{class:'section-heading'},el('h2',{},t.books),el('span',{class:'eyebrow'},t.bookHint)),
@@ -436,6 +502,13 @@ if (typeof document !== 'undefined') (() => {
     if (pageId === 'gallery' || pageId.startsWith('image-')) galleryPage(pageId);
     else if (pageId === 'index') landing(pages); else article(lookup.get(pageId));
   }
-  window.addEventListener('storage',event => { if (event.key === data.storageKey) { cutoff = ReaderRules.cutoff(data,event.newValue); render(); } });
+  window.addEventListener('storage',event => {
+    if (event.key === data.storageKey || event.key === null) {
+      const focusId = document.activeElement?.id;
+      cutoff = ReaderRules.cutoff(data,event.key === null ? null : event.newValue);
+      undoCutoff = null; clearPositionLink(); render();
+      if (focusId) focusControl(focusId);
+    }
+  });
   render();
 })();
