@@ -256,8 +256,8 @@ body:has(.image-viewer[open]) { overflow: hidden; }
 .reading-position { margin: 16px 0 10px; overflow-wrap: anywhere; }
 .reading-position strong { display: block; color: var(--ink); }
 .reading-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.reading-steps button { min-height: 44px; padding: 9px 7px; text-align: left; overflow-wrap: anywhere; }
-.reading-steps small, .reading-actions button small { display: block; margin-top: 5px; font-size: 11px; line-height: 1.4; color: var(--muted); }
+.reading-steps button { min-height: 44px; padding: 9px 7px; text-align: center; }
+.reading-actions button small { display: block; margin-top: 5px; font-size: 11px; line-height: 1.4; color: var(--muted); }
 .reading-steps button:disabled, .reading-actions button:disabled { opacity: .55; cursor: default; }
 .reading-actions { margin-top: 16px; border-top: 1px solid var(--line); }
 .reading-actions summary { padding: 12px 0; min-height: 44px; color: var(--accent); }
@@ -266,8 +266,5 @@ body:has(.image-viewer[open]) { overflow: hidden; }
 .reading-panel { max-height: calc(100dvh - 48px); overflow-y: auto; }
 @media (max-width: 760px) {
   .reading-panel { max-height: none; overflow: visible; }
-  .reading-selectors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
-  .reading-selectors > div { min-width: 0; }
   .reading-steps button { font-size: 16px; padding: 12px; }
-  .reading-steps small { font-size: 12px; }
 }

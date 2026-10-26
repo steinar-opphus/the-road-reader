@@ -218,34 +218,31 @@ if (typeof document !== 'undefined') (() => {
   function controls() {
     const holder = document.getElementById('controls');
     holder.hidden = false; holder.replaceChildren();
-    const book = el('select',{id:'book-choice','aria-label':t.book});
     const books = ReaderRules.books(data);
-    books.forEach((b,index) => book.append(el('option',{value:b.id},`${t.book} ${index+1} · ${b.title}`)));
     const current = data.chapters.find(c => c.rank === cutoff);
-    book.value = current ? ReaderRules.bookId(current) : books[0]?.id;
+    const currentBook = current ? ReaderRules.bookId(current) : books[0]?.id;
     const chapter = el('select',{id:'chapter-choice','aria-label':t.chapter});
-    function fill() {
-      chapter.replaceChildren(el('option',{value:0},t.notStarted));
-      data.chapters.filter(c => ReaderRules.bookId(c) === book.value).forEach(c => chapter.append(el('option',{value:c.rank},c.display_name || `${t.chapter} ${c.number}`)));
-      chapter.value = String(cutoff);
-      if (!chapter.value) chapter.value = '0';
+    chapter.append(el('option',{value:0},t.notStarted));
+    for (const [index,book] of books.entries()) {
+      chapter.append(el('optgroup',{label:`${t.book} ${index+1} · ${book.title}`},
+        data.chapters.filter(c => ReaderRules.bookId(c) === book.id).map(c =>
+          el('option',{value:c.rank},c.display_name || `${t.chapter} ${c.number}`))));
     }
-    fill();
+    chapter.value = String(cutoff);
     function stepButton(direction, id, label) {
       const target = ReaderRules.step(data,cutoff,direction);
       const destination = data.chapters.find(c => c.rank === target);
       const sameBook = current && destination && ReaderRules.bookId(current) === ReaderRules.bookId(destination);
       const hint = target === null ? (direction < 0 ? t.firstPosition : t.lastPosition) :
         sameBook ? (destination.display_name || `${t.chapter} ${destination.number}`) : positionLabel(target);
-      return el('button',{id,type:'button',disabled:target === null,onclick:() => save(target,id)},
-        el('span',{},`${label} ${t.chapter.toLowerCase()}`),el('small',{},hint));
+      return el('button',{id,type:'button',title:hint,'aria-label':`${label}: ${hint}`,
+        disabled:target === null,onclick:() => save(target,id)},label);
     }
     function complete(rank, message) {
       if (rank !== null && rank !== cutoff && window.confirm(message.replace('{position}',positionLabel(rank)))) save(rank,'reading-status-menu');
     }
-    const finishBook = el('button',{id:'finish-book',type:'button',disabled:ReaderRules.bookEnd(data,book.value) === cutoff,
-      onclick:() => complete(ReaderRules.bookEnd(data,book.value),t.confirmBook)},t.finishBook);
-    book.addEventListener('change',() => { fill(); finishBook.disabled = ReaderRules.bookEnd(data,book.value) === cutoff; chapter.focus(); });
+    const finishBook = el('button',{id:'finish-book',type:'button',disabled:ReaderRules.bookEnd(data,currentBook) === cutoff,
+      onclick:() => complete(ReaderRules.bookEnd(data,currentBook),t.confirmBook)},t.finishBook);
     chapter.addEventListener('change',() => save(Number(chapter.value),'chapter-choice'));
     const menu = el('details',{class:'reading-actions'},el('summary',{id:'reading-status-menu'},t.changeStatus),
       el('p',{class:'tiny'},t.availableOnly),finishBook);
@@ -255,7 +252,7 @@ if (typeof document !== 'undefined') (() => {
       t.resetStart,el('small',{},positionLabel(0))));
     holder.append(el('p',{id:'reading-position',class:'reading-position',role:'status',tabindex:'-1'},el('strong',{},t.readThrough+': '),positionLabel(cutoff)),
       el('div',{class:'reading-steps'},stepButton(-1,'previous-chapter',t.previous),stepButton(1,'next-chapter',t.next)),
-      el('div',{class:'reading-selectors'},el('div',{},el('label',{for:'book-choice'},t.book),book),el('div',{},el('label',{for:'chapter-choice'},t.chapter),chapter)),menu);
+      el('div',{class:'reading-selectors'},el('label',{for:'chapter-choice'},t.chapter),chapter),menu);
     if (undoCutoff !== null) holder.append(el('button',{id:'undo-reading',class:'reading-undo',type:'button',onclick:() => save(undoCutoff,'reading-status-menu')},t.undoReset));
     document.querySelector('.privacy-note').textContent = storageOK ? t.savedLocally : t.noStorage;
   }
