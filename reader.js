@@ -11,6 +11,7 @@ const ReaderRules = {
   },
   bookEnd(data, book) { return data.chapters.filter(c => this.bookId(c) === book).at(-1)?.rank ?? null; },
   lastPosition(data) { return data.chapters.at(-1)?.rank ?? 0; },
+  workComplete(data, cutoff) { return data.completed_at === this.lastPosition(data) && cutoff === data.completed_at && cutoff > 0; },
   link(token, page, cutoff) {
     const label = token.label || (page && this.name(page, cutoff)) || '';
     return {label, href: page && page.from <= cutoff && this.name(page, cutoff) ? page.file : null};
@@ -61,7 +62,7 @@ const ReaderRules = {
       const chapters = data.chapters.filter(c => bookId(c) === book);
       const ranks = new Set(chapters.map(c => c.rank));
       const blocks = story.filter(b => ranks.has(b.from));
-      if (book === currentBook) { current.push(...blocks); continue; }
+      if (book === currentBook && !this.workComplete(data,cutoff)) { current.push(...blocks); continue; }
       const recap = (page.recaps || []).find(r => r.book === book);
       if (blocks.length || recap) previous.push({book,title:chapters[0].book,
         blocks:recap ? recap.blocks.filter(b => b.from <= cutoff) : blocks,
@@ -390,7 +391,7 @@ if (typeof document !== 'undefined') (() => {
       if (!mainGroups.has(heading)) mainGroups.set(heading,[]);
       mainGroups.get(heading).push(block);
     }
-    const pastImages = images.filter(i => !usedImages.has(i.file) && history.previous.some(p => i.from >= p.from && i.from <= p.through));
+    const pastImages = images.filter(i => !usedImages.has(i.file) && (ReaderRules.workComplete(data,cutoff) || history.previous.some(p => i.from >= p.from && i.from <= p.through)));
     const mainImages = new Map();
     const refRank = group => Math.max(0,...group.flatMap(b => b.refs).map(ref => {
       const m = ref.match(/f-(b\d+)-(c\d+)-/i);
