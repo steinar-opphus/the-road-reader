@@ -268,3 +268,10 @@ body:has(.image-viewer[open]) { overflow: hidden; }
   .reading-panel { max-height: none; overflow: visible; }
   .reading-steps button { font-size: 16px; padding: 12px; }
 }
+
+/* Keep the first-visit choices together and reachable on narrow screens. */
+.start-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.start-actions button { min-height: 44px; padding: 10px 15px; }
+@media (max-width: 600px) {
+  .start-actions { width: 100%; flex-direction: column; align-items: stretch; }
+}
