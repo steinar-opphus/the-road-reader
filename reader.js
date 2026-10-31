@@ -463,7 +463,10 @@ if (typeof document !== 'undefined') (() => {
   function chapterFigures(page, chapter) {
     const images = ReaderRules.chapterImages(data,chapter,cutoff);
     if (!images.length) return null;
-    return el('div',{class:'chapter-images'},images.map(image => figure({file:image.asset,from:image.from,caption:image.caption},page)));
+    if (images.length === 1) return el('div',{class:'chapter-images'},
+      figure({file:images[0].asset,from:images[0].from,caption:images[0].caption},page));
+    return el('div',{class:'chapter-images chapter-gallery',role:'group','aria-label':chapter.heading},
+      el('div',{class:'gallery-grid'},images.map(image => galleryCard(image,page))));
   }
   function bookArticle(page) {
     app.append(el('div',{class:'book-meta'},el('span',{},t.book+' '+Number(page.book_id.slice(1))),
@@ -486,6 +489,15 @@ if (typeof document !== 'undefined') (() => {
     }
     app.append(el('p',{class:'later-note'},t.later),el('a',{href:'index.html',class:'back-link'},'← '+t.back));
   }
+  function galleryCard(image, page = null) {
+    const attrs = page
+      ? {class:'gallery-card',type:'button','aria-label':`${t.enlargeImage}: ${image.caption}`,
+          onclick:() => openImage({file:image.asset,from:image.from,caption:image.caption},page)}
+      : {class:'gallery-card',href:ReaderRules.navigationHref(data,image,cutoff)};
+    return el(page?'button':'a',attrs,
+      el('figure',{},el('img',{src:image.asset,alt:image.caption,loading:'lazy',decoding:'async'}),
+        el('figcaption',{},el('strong',{},image.title || t.illustration),el('p',{},image.caption))));
+  }
   function galleryPage(id) {
     const images = ReaderRules.gallery(data,cutoff);
     const galleryHref = ReaderRules.navigationHref(data,{file:'gallery.html'},cutoff);
@@ -493,10 +505,7 @@ if (typeof document !== 'undefined') (() => {
     if (id === 'gallery') {
       app.append(el('header',{class:'article-heading'},el('h1',{},t.gallery),el('p',{},t.galleryIntro)));
       if (!images.length) { app.append(el('p',{class:'empty-state'},t.emptyGallery)); return; }
-      app.append(el('div',{class:'gallery-grid'},images.map(image =>
-        el('a',{class:'gallery-card',href:ReaderRules.navigationHref(data,image,cutoff)},
-          el('figure',{},el('img',{src:image.asset,alt:image.caption,loading:'lazy',decoding:'async'}),
-            el('figcaption',{},el('strong',{},image.title || t.illustration),el('p',{},image.caption)))))));
+      app.append(el('div',{class:'gallery-grid'},images.map(image => galleryCard(image))));
       return;
     }
     const image = images.find(i => i.id === id);
