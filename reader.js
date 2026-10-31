@@ -418,7 +418,7 @@ if (typeof document !== 'undefined') (() => {
     }
     for (const [heading,group] of mainGroups) {
       const section = el('section',{class:'main-biography-section','data-history-book':group.find(b => b.profile_book)?.profile_book || null},
-        el('h2',{},heading),...prose(group),...(mainImages.get(heading)||[]).map(i => figure(i,page)));
+        el('h2',{},heading),...prose(group),articleFigures(mainImages.get(heading)||[],page,heading));
       intro.append(section);
     }
     top.append(intro);
@@ -455,18 +455,27 @@ if (typeof document !== 'undefined') (() => {
       const ranks = [...group.map(b => b.from),...(sectionImages.get(heading)||[]).map(i => i.from)];
       const title = group[0]?.heading || t.illustration;
       const summary = el('h3',{},title,el('small',{},chapterLabel(Math.max(...ranks))));
-      const content = el('div',{class:'prose'},prose(group), (sectionImages.get(heading)||[]).map(i => figure(i,page)));
+      const content = el('div',{class:'prose'},prose(group),articleFigures(sectionImages.get(heading)||[],page,title));
       app.append(el('section',{class:'story-section'},summary,content));
     }
     app.append(el('p',{class:'later-note'},t.later),el('a',{href:'index.html',class:'back-link'},'← '+t.back));
+  }
+  // Each call represents one consecutive image run at its existing prose position.
+  function articleFigures(images, page, label) {
+    if (!images.length) return null;
+    if (images.length === 1) return figure(images[0],page);
+    return miniGallery(images.map(image => ({...image,asset:image.file,title:name(page)})),page,label,'article-images article-gallery');
+  }
+  function miniGallery(images, page, label, classes) {
+    return el('div',{class:classes+' image-gallery',role:'group','aria-label':label},
+      el('div',{class:'gallery-grid'},images.map(image => galleryCard(image,page))));
   }
   function chapterFigures(page, chapter) {
     const images = ReaderRules.chapterImages(data,chapter,cutoff);
     if (!images.length) return null;
     if (images.length === 1) return el('div',{class:'chapter-images'},
       figure({file:images[0].asset,from:images[0].from,caption:images[0].caption},page));
-    return el('div',{class:'chapter-images chapter-gallery',role:'group','aria-label':chapter.heading},
-      el('div',{class:'gallery-grid'},images.map(image => galleryCard(image,page))));
+    return miniGallery(images,page,chapter.heading,'chapter-images chapter-gallery');
   }
   function bookArticle(page) {
     app.append(el('div',{class:'book-meta'},el('span',{},t.book+' '+Number(page.book_id.slice(1))),
