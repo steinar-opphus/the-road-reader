@@ -41,9 +41,13 @@ const ReaderRules = {
         return v.from <= cutoff && (!v.page || (page && page.from <= cutoff && this.name(page,cutoff)));
       });
       if (!variant) return [];
-      return [{id:image.id,file:image.file,asset:image.asset,from:variant.from,caption:variant.caption,
+      return [{id:image.id,file:image.file,asset:image.asset,chapter:image.chapter,from:variant.from,caption:variant.caption,
         title:variant.page ? this.name(pages.get(variant.page),cutoff) : ''}];
     });
+  },
+  chapterImages(data, chapter, cutoff) {
+    if (chapter.from > cutoff) return [];
+    return this.gallery(data,cutoff).filter(image => image.chapter === chapter.id);
   },
   nextImage(data, id, cutoff) {
     const images = this.gallery(data,cutoff), index = images.findIndex(i => i.id === id);
@@ -291,6 +295,7 @@ if (typeof document !== 'undefined') (() => {
   function openImage(image, page) {
     if (page.from > cutoff || image.from > cutoff || !name(page)) return;
     closeImageViewer();
+    const trigger = document.activeElement;
     const caption = el('p',{id:'image-viewer-caption'},t.noncanonical+' · '+name(page)+' · '+chapterLabel(image.from));
     const dialog = el('dialog',{class:'image-viewer','aria-label':t.illustration,'aria-describedby':'image-viewer-caption'},
       el('button',{type:'button',class:'image-viewer-close',autofocus:true,onclick:closeImageViewer},t.closeImage+' ×'),
@@ -300,7 +305,7 @@ if (typeof document !== 'undefined') (() => {
       const box = dialog.getBoundingClientRect();
       if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeImageViewer();
     });
-    dialog.addEventListener('close',() => { if (imageViewer === dialog) imageViewer = null; dialog.remove(); });
+    dialog.addEventListener('close',() => { if (imageViewer === dialog) imageViewer = null; dialog.remove(); if (trigger?.isConnected !== false) trigger?.focus?.(); });
     document.body.append(dialog);
     imageViewer = dialog;
     dialog.showModal();
@@ -455,6 +460,11 @@ if (typeof document !== 'undefined') (() => {
     }
     app.append(el('p',{class:'later-note'},t.later),el('a',{href:'index.html',class:'back-link'},'← '+t.back));
   }
+  function chapterFigures(page, chapter) {
+    const images = ReaderRules.chapterImages(data,chapter,cutoff);
+    if (!images.length) return null;
+    return el('div',{class:'chapter-images'},images.map(image => figure({file:image.asset,from:image.from,caption:image.caption},page)));
+  }
   function bookArticle(page) {
     app.append(el('div',{class:'book-meta'},el('span',{},t.book+' '+Number(page.book_id.slice(1))),
       el('span',{},page.summaries.length+' '+t.available)));
@@ -470,7 +480,8 @@ if (typeof document !== 'undefined') (() => {
     for (const chapters of batches.values()) {
       const section = el('section',{class:'chapter-batch'},el('h2',{},t.chapters+' '+chapters[0].number+'–'+chapters.at(-1).number));
       for (const chapter of chapters) section.append(el('section',{class:'story-section chapter-summary','data-chapter-id':chapter.id},
-        el('h3',{},chapter.heading),el('div',{class:'prose'},chapter.blocks.length?prose(chapter.blocks):el('p',{},t.noSummary))));
+        el('h3',{},chapter.heading),el('div',{class:'prose'},chapter.blocks.length?prose(chapter.blocks):el('p',{},t.noSummary)),
+        chapterFigures(page,chapter)));
       app.append(section);
     }
     app.append(el('p',{class:'later-note'},t.later),el('a',{href:'index.html',class:'back-link'},'← '+t.back));
