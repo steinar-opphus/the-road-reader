@@ -119,7 +119,7 @@ if (typeof document !== 'undefined') (() => {
     begin:'Begin reading',startTitle:'Your story starts here.',startText:'Choose the last chapter you have finished. People, places and illustrations will appear as you encounter them.',
     featured:'People to follow',featuredHint:'A FEW FAMILIAR FACES',read:'Read their story',firstMeeting:'First meeting',search:'Find a page',searchPlaceholder:'Search known names…',
     people:'More people',other:'Explore the world',noMatches:'No known pages match your search.',later:'Later material stays hidden. Change your reading position when you are ready.',
-    aboutTitle:'About this reader',aboutText:'This edition draws on the source-backed Markdown wiki. It organises its knowledge into a quieter, illustrated reading experience. Character development remains folded away until you choose to open it.',
+    aboutTitle:'About this reader',aboutText:'This edition draws on the source-backed Markdown wiki. It organises its knowledge into a quieter, illustrated reading experience. Available story developments are shown at your chosen reading position.',
     aboutMore:'Your reading position is stored only in this browser and is not synced between devices. Spoiler controls hide information in the interface; the complete exported site is publicly downloadable.',
     artNote:'Illustrations are noncanonical artistic interpretations. Their details are not additional evidence about the books.',
     futureTitle:'There is more to discover.',futureText:'This page is outside your selected reading position. Return after reading further, or change your chapter.',
@@ -436,7 +436,7 @@ if (typeof document !== 'undefined') (() => {
     const story = history.current;
     const groups = new Map();
     story.forEach(b => { const key = b.from+'|'+b.heading; if (!groups.has(key)) groups.set(key,[]); groups.get(key).push(b); });
-    // Additional images follow their explanation inside its disclosure, never as an unguarded gallery.
+    // Additional images follow their explanation inside its chapter-gated section, never as an unguarded gallery.
     const sectionImages = new Map();
     for (const image of images.filter(i => !usedImages.has(i.file))) {
       const matching = [...groups].filter(([,bs]) => Math.max(...bs.map(b => b.from)) >= image.from);
@@ -449,9 +449,9 @@ if (typeof document !== 'undefined') (() => {
     for (const [heading,group] of groups) {
       const ranks = [...group.map(b => b.from),...(sectionImages.get(heading)||[]).map(i => i.from)];
       const title = group[0]?.heading || t.illustration;
-      const summary = el('summary',{},title,el('small',{},chapterLabel(Math.max(...ranks))));
+      const summary = el('h3',{},title,el('small',{},chapterLabel(Math.max(...ranks))));
       const content = el('div',{class:'prose'},prose(group), (sectionImages.get(heading)||[]).map(i => figure(i,page)));
-      app.append(el('details',{class:'story-section'},summary,content));
+      app.append(el('section',{class:'story-section'},summary,content));
     }
     app.append(el('p',{class:'later-note'},t.later),el('a',{href:'index.html',class:'back-link'},'← '+t.back));
   }
@@ -469,8 +469,8 @@ if (typeof document !== 'undefined') (() => {
     }
     for (const chapters of batches.values()) {
       const section = el('section',{class:'chapter-batch'},el('h2',{},t.chapters+' '+chapters[0].number+'–'+chapters.at(-1).number));
-      for (const chapter of chapters) section.append(el('details',{class:'story-section chapter-summary','data-chapter-id':chapter.id},
-        el('summary',{},chapter.heading),el('div',{class:'prose'},chapter.blocks.length?prose(chapter.blocks):el('p',{},t.noSummary))));
+      for (const chapter of chapters) section.append(el('section',{class:'story-section chapter-summary','data-chapter-id':chapter.id},
+        el('h3',{},chapter.heading),el('div',{class:'prose'},chapter.blocks.length?prose(chapter.blocks):el('p',{},t.noSummary))));
       app.append(section);
     }
     app.append(el('p',{class:'later-note'},t.later),el('a',{href:'index.html',class:'back-link'},'← '+t.back));

@@ -143,9 +143,9 @@ figcaption .badge { color: var(--accent); font-size: 11px; letter-spacing: .03em
 .key-facts li + li { margin-top: 5px; }
 .story-title { margin: 32px 0 15px; font-size: 23px; font-weight: 600; line-height: 1.4; letter-spacing: -.015em; }
 .story-section { max-width: 100%; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; }
-.story-section > summary { padding: 16px 6px; font-size: 17px; line-height: 1.5; font-weight: 550; overflow-wrap: anywhere; }
-.story-section > summary small { display: block; margin: 5px 0 0 19px; color: var(--muted); font-size: 11px; font-weight: 400; }
-.story-section[open] > summary { margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+.story-section > h3 { margin: 0; padding: 16px 6px; font-size: 17px; line-height: 1.5; font-weight: 550; overflow-wrap: anywhere; }
+.story-section > h3 small { display: block; margin: 5px 0 0; color: var(--muted); font-size: 11px; font-weight: 400; }
+
 .story-section > .prose { padding: 0 6px 6px; }
 .story-section figure { max-width: 620px; margin: 22px auto; }
 .story-section .prose > p:last-of-type { margin-bottom: 13px; }
@@ -164,7 +164,7 @@ figcaption .badge { color: var(--accent); font-size: 11px; letter-spacing: .03em
 .book-intro { max-width: 850px; }
 .chapter-batch { padding-top: 12px; margin-bottom: 26px; }
 .chapter-batch > h2 { color: var(--muted); font-size: 13px; font-weight: 600; }
-.chapter-summary > summary { font-size: 17px; }
+.chapter-summary > h3 { font-size: 17px; }
 .book-history .prose { max-width: 850px; }
 footer { max-width: 1480px; margin: auto; padding: 22px 32px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 footer > span:first-child { color: var(--ink); font-size: 14px; font-weight: 500; }
@@ -218,7 +218,7 @@ body:has(.image-viewer[open]) { overflow: hidden; }
   .prose .page-description { font-size: 18px; }
   .article-heading h1 { font-size: 36px; }
   .key-facts { font-size: 13px; }
-  .story-section > summary { min-height: 44px; font-size: 16px; }
+  .story-section > h3 { min-height: 44px; font-size: 16px; }
   .directory-tools { align-items: stretch; flex-direction: column; gap: 6px; }
   .directory-tools input { font-size: 16px; }
   .directory-list { gap: 0 16px; }
